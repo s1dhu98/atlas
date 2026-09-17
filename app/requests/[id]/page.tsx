@@ -9,7 +9,7 @@ import {
   getRequest, getRequestItems, getCoveringLabs, getDiscoveredLabs, getPackageTests,
   getPincodeIntel,
 } from '@/lib/requestQueries';
-import { lastDiscoveryRun } from '@/lib/discoverLabs';
+import { lastDiscoveryRun, discoveryEnabled } from '@/lib/discoverLabs';
 import {
   STATE_SHORT, STATE_TONE, TONE_CHIP, BASIS_LABEL, BASIS_STRENGTH, DISCIPLINE_LABEL,
 } from '@/lib/requests';
@@ -48,6 +48,12 @@ export default async function RequestDetail({ params }: { params: { id: string }
   // lab exists there is a real relationship to use, and an unverified search
   // result would only compete with it.
   const noLabHere = labs.length === 0 || labs.every((l) => (l.missing ?? 1) > 0);
+
+  // While discovery is off the card only appears where earlier searches already
+  // found something. Offering a search that will refuse is worse than offering
+  // nothing, and a pincode with no leads and no way to get any has nothing to
+  // put on a card.
+  const canSearch = discoveryEnabled();
 
   const tone = STATE_TONE[r.state] ?? 'ink';
 
@@ -201,16 +207,18 @@ export default async function RequestDetail({ params }: { params: { id: string }
             </CardBody>
           </Card>
 
-          {(noLabHere || leads.length > 0) && r.pincode && (
+          {((noLabHere && canSearch) || leads.length > 0) && r.pincode && (
             <Card>
               <CardHeader
-                title="Labs found on the open web"
-                subtitle="Unverified search results — leads to call, not network records." />
+                title="Labs found outside the network"
+                subtitle="Unverified leads to call, not network records. Read the caveats before dialling." />
               <CardBody className="pt-0">
                 <div className="mb-3">
                   <FindLabs pincode={r.pincode} city={r.city} state={r.state_name}
                             lastRun={lastRun?.ran_at ?? null} found={lastRun?.found ?? null}
                             error={lastRun?.error ?? null}
+                            source={lastRun?.provider ?? null}
+                            enabled={canSearch}
                             disciplines={r.disciplines} />
                   {lastRun?.error && (
                     <p className="text-[11px] text-ink-500 mt-1">
@@ -220,8 +228,8 @@ export default async function RequestDetail({ params }: { params: { id: string }
                 </div>
                 {leads.length === 0 && (
                   <p className="text-xs text-ink-500">
-                    Nothing found yet for {r.pincode}. Searching costs a few seconds and the
-                    results are cached, so it is worth doing once per pincode rather than once
+                    Nothing found yet for {r.pincode}. A lookup takes a second or two and the
+                    results are stored, so it is worth doing once per pincode rather than once
                     per request.
                   </p>
                 )}
@@ -234,15 +242,47 @@ export default async function RequestDetail({ params }: { params: { id: string }
                                          border border-warn-100 bg-warn-50 rounded px-1">
                           unverified
                         </span>
+                        {l.rating && (
+                          <span className="text-[11px] text-ink-600 num">
+                            {Number(l.rating).toFixed(1)}★
+                            {l.review_count != null && (
+                              <span className="text-ink-400"> ({l.review_count})</span>
+                            )}
+                          </span>
+                        )}
+                        {l.pincode_match === 'exact' && (
+                          <span className="text-[10px] text-success-600">in {r.pincode}</span>
+                        )}
+                        {l.pincode_match !== 'exact' && l.distance_km != null && (
+                          <span className="text-[10px] text-ink-400 num">
+                            {Number(l.distance_km).toFixed(1)} km away
+                          </span>
+                        )}
                         <span className="ml-auto">
                           <LeadActions leadId={l.id} promoted={!!l.crm_provider_id} />
                         </span>
                       </div>
                       <div className="text-xs text-ink-600">{l.address}</div>
                       {l.phone && <div className="text-xs text-ink-700 num">{l.phone}</div>}
-                      {l.source_url && (
-                        <div className="text-[10px] text-ink-400 truncate">{l.source_url}</div>
+                      {/* The caveats are the reason this row is a lead and not a
+                          record. They sit above the source link rather than
+                          behind a tooltip, because the cost of not reading them
+                          is somebody's morning. */}
+                      {l.caveats && l.caveats.length > 0 && (
+                        <ul className="mt-1 text-[11px] text-warn-600 space-y-0.5">
+                          {l.caveats.map((c, i) => <li key={i}>· {c}</li>)}
+                        </ul>
                       )}
+                      {l.reasons && l.reasons.length > 0 && (
+                        <div className="mt-0.5 text-[11px] text-ink-500">
+                          {l.reasons.join(' ')}
+                        </div>
+                      )}
+                      <div className="text-[10px] text-ink-400 truncate">
+                        {l.source && <span className="uppercase tracking-wide">{l.source}</span>}
+                        {l.source && l.source_url && ' · '}
+                        {l.source_url}
+                      </div>
                     </li>
                   ))}
                 </ul>

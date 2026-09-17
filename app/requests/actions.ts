@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getSessionUser } from '@/lib/auth';
 import { queryOne } from '@/lib/db';
 import { canManage } from '@/lib/access';
-import { discoverForPincode } from '@/lib/discoverLabs';
+import { discoverForPincode, discoveryEnabled, DISABLED_MESSAGE } from '@/lib/discoverLabs';
 
 type R = { ok: boolean; error?: string; id?: number };
 
@@ -67,26 +67,35 @@ export async function syncCommitments(): Promise<R & { opened?: number; closed?:
 }
 
 /**
- * Search the web for labs in a pincode we cannot reach.
+ * Look for labs in a pincode we cannot reach.
  *
  * Triggered from the request the network team is looking at, rather than only
  * by the nightly batch — when someone is working a supply gap now, "run the
  * script and come back tomorrow" is not an answer.
+ *
+ * The flag is checked here as well as inside the search. Two checks for one
+ * condition looks redundant and is not: this one refuses before the action
+ * touches the database at all, so while discovery is off a click cannot write
+ * a run row claiming we looked. The one underneath is what protects the batch
+ * script and anything else that calls the same function later.
  */
 export async function findLabsForPincode(
   pincode: string, city?: string | null, state?: string | null,
   disciplines?: string[] | null,
-): Promise<R & { found?: number }> {
+): Promise<R & { found?: number; provider?: string; costUsd?: number }> {
   const me = await getSessionUser();
   if (!me) return { ok: false, error: 'unauthenticated' };
   if (!canManage(me, 'commitments')) {
     return { ok: false, error: 'Searching for labs needs the network or admin role' };
   }
+  if (!discoveryEnabled()) return { ok: false, error: DISABLED_MESSAGE, found: 0 };
   if (!/^\d{6}$/.test(pincode)) return { ok: false, error: 'Bad pincode' };
 
   const r = await discoverForPincode(pincode, city, state, disciplines);
   revalidatePath(`/requests`);
-  return r.error ? { ok: false, error: r.error, found: 0 } : { ok: true, found: r.found };
+  return r.error
+    ? { ok: false, error: r.error, found: 0 }
+    : { ok: true, found: r.found, provider: r.provider, costUsd: r.costUsd };
 }
 
 /**

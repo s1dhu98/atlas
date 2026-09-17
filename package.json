@@ -15,6 +15,11 @@
     "cities:enrich": "tsx scripts/enrich-city-tiers.ts",
     "tiers:enrich": "tsx scripts/enrich-provider-tiers.ts",
     "labs:discover": "tsx scripts/discover-labs.ts",
+    "labs:status": "tsx scripts/discover-labs.ts --status",
+    "labs:estimate": "tsx scripts/discover-labs.ts --estimate",
+    "labs:purge": "tsx scripts/discover-labs.ts --purge",
+    "labs:selftest": "tsx scripts/discovery-selftest.ts",
+    "labs:dbtest": "tsx scripts/discovery-dbtest.ts",
     "commitments:sync": "./scripts/sync-commitments.sh"
   },
   "dependencies": {

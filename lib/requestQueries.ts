@@ -414,16 +414,31 @@ export async function getPincodeIntel(pincode: string) {
   `, [pincode]);
 }
 
-/** Unverified web leads for a pincode. Never mixed into the lab list above. */
+/**
+ * Unverified leads for a pincode. Never mixed into the lab list above.
+ *
+ * Carries the ranking layer's working alongside each row — which source found
+ * it, whether the address actually names the pincode, how far off the centroid
+ * it is, and the caveats. A lead is a request that somebody spend a morning on
+ * the phone, and the difference between a good morning and a wasted one is
+ * whether they could see what was wrong with it before they dialled.
+ */
 export async function getDiscoveredLabs(pincode: string) {
   return query<{
     id: number; name: string; address: string | null; phone: string | null;
     source_url: string | null; retrieved_at: string; crm_provider_id: number | null;
+    source: string | null; rating: string | null; review_count: number | null;
+    rank_score: string | null; pincode_match: string | null; distance_km: string | null;
+    kinds: string[] | null; reasons: string[] | null; caveats: string[] | null;
   }>(`
-    SELECT id, name, address, phone, source_url, retrieved_at, crm_provider_id
+    SELECT id, name, address, phone, source_url, retrieved_at, crm_provider_id,
+           source, rating, review_count, rank_score, pincode_match, distance_km,
+           kinds, reasons, caveats
     FROM atlas.discovered_lab
     WHERE pincode = $1 AND NOT dismissed
-    ORDER BY confidence DESC NULLS LAST, name
+    -- rank_score is the new name for the same number; COALESCE keeps rows that
+    -- predate the source migration in a sensible place rather than at the end.
+    ORDER BY COALESCE(rank_score, confidence) DESC NULLS LAST, name
   `, [pincode]);
 }
 
