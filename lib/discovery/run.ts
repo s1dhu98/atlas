@@ -18,6 +18,7 @@
 import { DISABLED_MESSAGE, discoveryConfig } from './config';
 import { dedupe, rankAll } from './rank';
 import { PROVIDERS } from './providers';
+import { MODEL as LLM_MODEL } from './providers/llm';
 import type {
   Discipline, DiscoveryTarget, ProviderName, ProviderOutcome, RankedLead,
 } from './types';
@@ -225,7 +226,7 @@ async function persist(
       WHERE atlas.discovered_lab.verified_at IS NULL
     `, [
       t.pincode, l.name, l.address, l.phone, l.sourceUrl, t.city, t.state,
-      l.score, l.provider === 'llm' ? 'claude-opus-5' : null,
+      l.score, l.provider === 'llm' ? LLM_MODEL : null,
       l.provider, l.externalId, l.rating, l.reviewCount, l.lat, l.lng,
       l.kinds, l.pincodeMatch, l.distanceKm, l.score, l.reasons, l.caveats,
     ]);
@@ -242,7 +243,7 @@ async function persist(
       calls = EXCLUDED.calls, cost_usd = EXCLUDED.cost_usd
   `, [
     t.pincode, leads.length,
-    run.tried.includes('llm') ? 'claude-opus-5' : null,
+    run.tried.includes('llm') ? LLM_MODEL : null,
     run.error, run.primary, run.tried, run.calls, run.costUsd,
   ]);
 

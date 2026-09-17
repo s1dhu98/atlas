@@ -22,7 +22,7 @@ import { emptyHit } from '../types';
 import { discoveryConfig } from '../config';
 import { DISCIPLINE_SEARCH } from '../../requests';
 
-const MODEL = 'claude-opus-5';
+export const MODEL = 'claude-opus-5';
 
 function wanted(disciplines?: string[] | null): string {
   const kinds = (disciplines?.length ? disciplines : ['PATHOLOGY'])

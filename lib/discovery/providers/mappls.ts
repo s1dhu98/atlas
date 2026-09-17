@@ -98,21 +98,25 @@ export const mapplsProvider: DiscoveryProvider = {
   async search(t: DiscoveryTarget): Promise<ProviderOutcome> {
     const cfg = discoveryConfig();
     const out: ProviderOutcome = { provider: 'mappls', hits: [], calls: 0, costUsd: 0 };
+    const queries = queriesFor(t);
+    // Accrued per successful call, not after the loop: a provider that dies
+    // partway has still billed for the calls it did answer.
+    const perCall = cfg.costUsd.mappls / Math.max(1, queries.length);
     try {
       const auth = await bearer(cfg.keys.mapplsClientId!, cfg.keys.mapplsClientSecret!);
-      for (const q of queriesFor(t)) {
+      for (const q of queries) {
         const url =
           `${NEARBY_URL}?keywords=${encodeURIComponent(q)}` +
           `&refLocation=${t.lat},${t.lng}&radius=${Math.round(cfg.radiusM)}&page=1`;
         const json = await getJson(url, { headers: { Authorization: `Bearer ${auth}` } });
         out.calls += 1;
+        out.costUsd = out.calls * perCall;
         const rows: any[] = json?.suggestedLocations ?? json?.results ?? json?.data ?? [];
         for (const r of rows) {
           const hit = toHit(r);
           if (hit) out.hits.push(hit);
         }
       }
-      out.costUsd = out.calls * (cfg.costUsd.mappls / Math.max(1, queriesFor(t).length));
       return out;
     } catch (e) {
       out.error = describeError(e);

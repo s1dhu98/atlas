@@ -78,6 +78,9 @@ export const googleProvider: DiscoveryProvider = {
     const cfg = discoveryConfig();
     const out: ProviderOutcome = { provider: 'google', hits: [], calls: 0, costUsd: 0 };
     const queries = queriesFor(t);
+    // Accrued per successful call, not after the loop: a provider that dies
+    // partway has still billed for the calls it did answer.
+    const perCall = cfg.costUsd.google / Math.max(1, queries.length);
     try {
       for (const q of queries) {
         const body: Record<string, unknown> = {
@@ -103,12 +106,12 @@ export const googleProvider: DiscoveryProvider = {
           body: JSON.stringify(body),
         });
         out.calls += 1;
+        out.costUsd = out.calls * perCall;
         for (const p of (json?.places ?? []) as any[]) {
           const hit = toHit(p);
           if (hit) out.hits.push(hit);
         }
       }
-      out.costUsd = out.calls * (cfg.costUsd.google / Math.max(1, queries.length));
       return out;
     } catch (e) {
       out.error = describeError(e);

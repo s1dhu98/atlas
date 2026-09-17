@@ -129,6 +129,10 @@ async function main() {
 
     console.log('\npromotion carries the source forward');
     const who = (await db.query<any>(`SELECT id FROM atlas.users ORDER BY id LIMIT 1`))[0];
+    // A scratch copy is often schema-only, and promotion needs somebody to
+    // promote as. Say so plainly rather than dying on undefined.id.
+    if (!who) throw new Error('atlas.users is empty — promotion needs one user row. ' +
+                              'Seed the scratch database with any user and re-run.');
     const lead = (await db.query<any>(`SELECT id FROM atlas.discovered_lab
                                         WHERE pincode = $1 AND name = 'Jai Diagnostic Laboratory'`, [PIN]))[0];
     const crmId = (await db.query<any>(`SELECT atlas.promote_discovered_lab($1,$2) AS id`, [lead.id, who.id]))[0].id;

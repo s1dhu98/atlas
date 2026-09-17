@@ -54,6 +54,9 @@ export const olaProvider: DiscoveryProvider = {
     const cfg = discoveryConfig();
     const out: ProviderOutcome = { provider: 'ola', hits: [], calls: 0, costUsd: 0 };
     const queries = queriesFor(t);
+    // Accrued per successful call, not after the loop: a provider that dies
+    // partway has still billed for the calls it did answer.
+    const perCall = cfg.costUsd.ola / Math.max(1, queries.length);
     try {
       for (const q of queries) {
         const loc = t.lat != null && t.lng != null
@@ -63,13 +66,13 @@ export const olaProvider: DiscoveryProvider = {
           `&api_key=${encodeURIComponent(cfg.keys.olaApiKey!)}`;
         const json = await getJson(url);
         out.calls += 1;
+        out.costUsd = out.calls * perCall;
         const rows: any[] = json?.predictions ?? json?.results ?? [];
         for (const r of rows) {
           const hit = toHit(r);
           if (hit) out.hits.push(hit);
         }
       }
-      out.costUsd = out.calls * (cfg.costUsd.ola / Math.max(1, queries.length));
       return out;
     } catch (e) {
       out.error = describeError(e);
